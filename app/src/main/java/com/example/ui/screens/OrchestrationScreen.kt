@@ -60,6 +60,8 @@ fun OrchestrationScreen(
     val telemetry by viewModel.telemetry.collectAsState()
     val handsFreeContinuous by viewModel.handsFreeContinuous.collectAsState()
     val isAccessibilityActive by viewModel.isAccessibilityActive.collectAsState()
+    val voicePreset by viewModel.voicePreset.collectAsState()
+    val audioEngineMode by viewModel.audioEngineMode.collectAsState()
 
     // Permission launcher for RECORD_AUDIO
     val recordAudioLauncher = rememberLauncherForActivityResult(
@@ -103,11 +105,11 @@ fun OrchestrationScreen(
                         containerColor = IrisCyanPrimary.copy(alpha = 0.2f),
                         contentColor = IrisCyanPrimary
                     ) {
-                        Text("Companion", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("${if (audioEngineMode.isLiveStreaming) "3.1 Live" else "3.5"} • ${voicePreset.voiceName}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Text(
-                    text = if (language == AppLanguage.BENGALI) "আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী" else "Your Personal Assistant & Companion",
+                    text = if (language == AppLanguage.BENGALI) "Gemini 3.1 Flash Live • ভয়েস: ${voicePreset.voiceName}" else "Gemini 3.1 Flash Live • Voice: ${voicePreset.voiceName}",
                     color = IrisTextMuted,
                     fontSize = 11.sp
                 )

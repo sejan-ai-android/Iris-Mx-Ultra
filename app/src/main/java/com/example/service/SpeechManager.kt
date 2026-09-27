@@ -12,6 +12,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
 import com.example.data.model.AppLanguage
+import com.example.data.model.GeminiVoicePreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +39,10 @@ class SpeechManager(
     private val _currentLanguage = MutableStateFlow(AppLanguage.BENGALI)
     val currentLanguage: StateFlow<AppLanguage> = _currentLanguage.asStateFlow()
 
+    // Voice Preset: Puck (Default)
+    private val _voicePreset = MutableStateFlow(GeminiVoicePreset.DEFAULT)
+    val voicePreset: StateFlow<GeminiVoicePreset> = _voicePreset.asStateFlow()
+
     // Hands-free continuous listening mode enabled by default
     private val _handsFreeContinuous = MutableStateFlow(true)
     val handsFreeContinuous: StateFlow<Boolean> = _handsFreeContinuous.asStateFlow()
@@ -54,8 +59,7 @@ class SpeechManager(
             if (status == TextToSpeech.SUCCESS) {
                 isTtsReady = true
                 applyLanguageToTts(_currentLanguage.value)
-                textToSpeech?.setSpeechRate(1.15f) // Optimized brisk speaking rate for ultra-low latency
-                textToSpeech?.setPitch(1.0f)
+                applyVoicePresetToTts(_voicePreset.value)
                 textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         _isSpeaking.value = true
@@ -92,6 +96,17 @@ class SpeechManager(
         } else if (!enabled) {
             cancelScheduledRestart()
         }
+    }
+
+    fun setVoicePreset(preset: GeminiVoicePreset) {
+        _voicePreset.value = preset
+        applyVoicePresetToTts(preset)
+    }
+
+    private fun applyVoicePresetToTts(preset: GeminiVoicePreset) {
+        textToSpeech?.setPitch(preset.pitch)
+        textToSpeech?.setSpeechRate(preset.speed)
+        Log.i("SpeechManager", "Applied Voice Preset: ${preset.voiceName} (Pitch: ${preset.pitch}, Speed: ${preset.speed})")
     }
 
     fun setLanguage(language: AppLanguage) {

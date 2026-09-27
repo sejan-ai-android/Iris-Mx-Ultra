@@ -3,6 +3,7 @@ package com.example.data.repository
 import com.example.data.local.AppDatabase
 import com.example.data.model.*
 import com.example.data.remote.GeminiApiClient
+import com.example.data.remote.GeminiLiveWebSocketClient
 import com.example.service.AnyClawBridge
 import com.example.service.NativeDeviceBridge
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +23,8 @@ class IrisAgentRepository(
     private val database: AppDatabase,
     private val nativeBridge: NativeDeviceBridge,
     private val anyClawBridge: AnyClawBridge,
-    private val geminiApiClient: GeminiApiClient
+    private val geminiApiClient: GeminiApiClient,
+    val geminiLiveClient: GeminiLiveWebSocketClient = GeminiLiveWebSocketClient()
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
 
@@ -90,6 +92,11 @@ class IrisAgentRepository(
         prompt: String,
         language: AppLanguage,
         apiKeyOverride: String?,
+        voicePreset: GeminiVoicePreset = GeminiVoicePreset.DEFAULT,
+        addressingMode: AddressingMode = AddressingMode.DEFAULT,
+        customUserName: String = "",
+        personalityMode: PersonalityMode = PersonalityMode.DEFAULT,
+        audioEngineMode: AudioEngineMode = AudioEngineMode.DEFAULT,
         onStepUpdated: (ExecutionDag) -> Unit
     ): ChatMessage {
         val startTime = System.currentTimeMillis()
@@ -167,13 +174,18 @@ class IrisAgentRepository(
         onStepUpdated(completedDag)
         updateAgentStatus(AgentType.EXECUTOR, AgentStatus.SUCCESS)
 
-        // 5. Synthesize Final Warm, Human-Like Response (Gemini API with Fallback)
+        // 5. Synthesize Final Warm, Human-Like Response (Gemini 3.1 Flash Live Bidirectional Streaming with Fallback)
         val finalResponseText = synthesizeResponse(
             userPrompt = prompt,
             dag = completedDag,
             toolResults = toolResults,
             language = language,
-            apiKeyOverride = apiKeyOverride
+            apiKeyOverride = apiKeyOverride,
+            voicePreset = voicePreset,
+            addressingMode = addressingMode,
+            customUserName = customUserName,
+            personalityMode = personalityMode,
+            audioEngineMode = audioEngineMode
         )
 
         updateAgentStatus(AgentType.ORCHESTRATOR, AgentStatus.IDLE)
@@ -182,7 +194,7 @@ class IrisAgentRepository(
         emitBusEvent(
             AgentType.ORCHESTRATOR,
             "WORKFLOW_TERMINATED",
-            "Swarm task resolved in ${totalLatency}ms.",
+            "Swarm task resolved in ${totalLatency}ms via ${audioEngineMode.modelName}.",
             totalLatency
         )
 
@@ -507,26 +519,68 @@ class IrisAgentRepository(
         dag: ExecutionDag,
         toolResults: List<String>,
         language: AppLanguage,
-        apiKeyOverride: String?
+        apiKeyOverride: String?,
+        voicePreset: GeminiVoicePreset = GeminiVoicePreset.DEFAULT,
+        addressingMode: AddressingMode = AddressingMode.DEFAULT,
+        customUserName: String = "",
+        personalityMode: PersonalityMode = PersonalityMode.DEFAULT,
+        audioEngineMode: AudioEngineMode = AudioEngineMode.DEFAULT
     ): String {
+        val userTitle = when (addressingMode) {
+            AddressingMode.CUSTOM -> customUserName.ifBlank { "Boss" }
+            AddressingMode.BOSS -> "Boss"
+            AddressingMode.SIR -> "Sir"
+            AddressingMode.FRIEND -> "Friend"
+        }
+        val bengaliTitle = when (addressingMode) {
+            AddressingMode.CUSTOM -> customUserName.ifBlank { "বস" }
+            AddressingMode.BOSS -> "বস"
+            AddressingMode.SIR -> "স্যার"
+            AddressingMode.FRIEND -> "বন্ধু"
+        }
+
         val sysInstruction = """
-            You are IRIS, a warm, supportive, and ultra-swift real-life Chief of Staff (IRIS-MX Ultra).
+            You are IRIS, an expressive, highly responsive, warm and ultra-swift real-life personal assistant (IRIS-MX Ultra).
             
-            SPEED & CONVERSATIONAL MANDATES:
-            1. ULTRA-LOW LATENCY & BREVITY: Keep answers extremely crisp, direct, and swift (1 sentence maximum). Deliver instant, sub-second responses for live hands-free voice flow.
-            2. PERSONALITY: Warm, friendly, supportive, and reliable. Avoid robotic jargon, cold status codes, or execution DAG syntax.
-            3. ZERO CODE: Never output code blocks, terminal logs, or execution DAG syntaxes.
-            4. LANGUAGE: Respond in natural, conversational ${if (language == AppLanguage.BENGALI) "Bengali (বাংলা)" else "English"}.
-            5. HANDS-FREE COMPANION: If performing device actions or reading screens, report the result warmly and immediately.
+            ENGINE & VOICE DYNAMICS:
+            - Primary Audio/Live Engine: ${audioEngineMode.title}
+            - Voice Preset: ${voicePreset.voiceName} (${voicePreset.toneDescription})
+            - Personality Mode: ${personalityMode.title} (${personalityMode.description})
+            - Respectfully address the user as '$userTitle' (or '$bengaliTitle' in Bengali).
+            - Natural conversational blend: Friendly, helpful, natural mix of Hinglish, English, and Bengali as appropriate to the conversation.
+            - Maintain an expressive, highly responsive, and human-like voice dynamic without robotic pauses.
+            
+            MANDATES:
+            1. ULTRA-LOW LATENCY & BREVITY: Keep answers extremely crisp, direct, and swift (1 sentence maximum).
+            2. ZERO CODE: Never output code blocks, terminal logs, or execution DAG syntaxes.
+            3. Dynamic Addressing: Seamlessly address the user as '$userTitle' or '$bengaliTitle'.
+            4. If executing device/accessibility actions, confirm immediately and warmly.
         """.trimIndent()
 
         val promptPayload = """
-            User: "$userPrompt"
-            Device Actions: ${toolResults.joinToString("; ")}
+            User ($userTitle): "$userPrompt"
+            Actions Completed: ${toolResults.joinToString("; ")}
             
-            Give an instant, crisp, warm 1-sentence response.
+            Reply immediately in 1 crisp, expressive sentence addressing $userTitle.
         """.trimIndent()
 
+        // 1. If Live WebSocket Bidirectional Streaming is enabled (Default), attempt real-time stream
+        if (audioEngineMode.isLiveStreaming) {
+            val liveResult = geminiLiveClient.streamLiveTurn(
+                userPrompt = promptPayload,
+                apiKeyOverride = apiKeyOverride,
+                voicePreset = voicePreset,
+                systemPrompt = sysInstruction
+            )
+            if (liveResult.isSuccess) {
+                val liveText = liveResult.getOrNull()
+                if (!liveText.isNullOrBlank()) {
+                    return liveText
+                }
+            }
+        }
+
+        // 2. Standard REST generation fallback
         val geminiResult = geminiApiClient.generateSwarmResponse(
             prompt = promptPayload,
             systemInstruction = sysInstruction,
@@ -534,68 +588,74 @@ class IrisAgentRepository(
         )
 
         return geminiResult.getOrElse {
-            // Local high-speed fallback synthesis with warm, friendly persona
-            generateFriendlyFallback(userPrompt, language, toolResults)
+            // Local high-speed fallback synthesis with warm, friendly persona & dynamic addressing
+            generateFriendlyFallback(userPrompt, language, toolResults, userTitle, bengaliTitle)
         }
     }
 
-    private fun generateFriendlyFallback(prompt: String, language: AppLanguage, toolResults: List<String> = emptyList()): String {
+    private fun generateFriendlyFallback(
+        prompt: String,
+        language: AppLanguage,
+        toolResults: List<String> = emptyList(),
+        userTitle: String = "Boss",
+        bengaliTitle: String = "বস"
+    ): String {
         val lower = prompt.lowercase()
         val firstToolResult = toolResults.firstOrNull()?.take(120)
 
         return if (language == AppLanguage.BENGALI) {
             when {
                 lower.contains("read screen") || lower.contains("স্ক্রিনে") || lower.contains("পড়ো") || lower.contains("স্ক্রিন") ->
-                    firstToolResult ?: "স্ক্রিনের তথ্য দেখে নিয়েছি! কী করতে চান বলুন।"
+                    firstToolResult ?: "স্ক্রিনের তথ্য দেখে নিয়েছি, $bengaliTitle! কী করতে চান বলুন।"
                 lower.contains("click") || lower.contains("tap") || lower.contains("ক্লিক") || lower.contains("ট্যাপ") ->
-                    "বাটনে ক্লিক করে দিয়েছি!"
+                    "বাটনে ক্লিক করে দিয়েছি, $bengaliTitle!"
                 lower.contains("type") || lower.contains("টাইপ") || lower.contains("লেখো") ->
-                    "লেখাটি টাইপ করে দেওয়া হয়েছে।"
+                    "লেখাটি টাইপ করে দিয়েছি, $bengaliTitle।"
                 lower.contains("scroll") || lower.contains("স্ক্রল") ->
-                    "স্ক্রিন স্ক্রল করে দিয়েছি।"
+                    "স্ক্রিন স্ক্রল করে দিয়েছি, $bengaliTitle।"
                 lower.contains("home") || lower.contains("হোম") ->
-                    "হোম স্ক্রিনে চলে এসেছি।"
+                    "হোম স্ক্রিনে চলে এসেছি, $bengaliTitle।"
                 lower.contains("back") || lower.contains("পিছনে") || lower.contains("ব্যাক") ->
-                    "পূর্ববর্তী পেজে ফিরে এসেছি।"
+                    "পূর্ববর্তী পেজে ফিরে এসেছি, $bengaliTitle।"
                 lower.contains("গান") || lower.contains("music") || lower.contains("play") || lower.contains("song") ->
-                    "আপনার জন্য গানটি চালিয়ে দিয়েছি!"
+                    "আপনার জন্য গানটি চালিয়ে দিয়েছি, $bengaliTitle!"
                 lower.contains("খোলো") || lower.contains("open") || lower.contains("অ্যাপ") || lower.contains("app") ->
-                    "অ্যাপটি ওপেন করে দিয়েছি।"
+                    "অ্যাপটি ওপেন করে দিয়েছি, $bengaliTitle।"
                 lower.contains("নোট") || lower.contains("মনে") || lower.contains("save") || lower.contains("remember") ->
-                    "নোটটি যত্নসহকারে সেভ করে রেখেছি!"
+                    "নোটটি যত্নসহকারে সেভ করে রেখেছি, $bengaliTitle!"
                 lower.contains("কেমন") || lower.contains("হ্যালো") || lower.contains("hi") || lower.contains("hello") ->
-                    "হ্যালো! আমি দারুণ আছি। আপনাকে কীভাবে সাহায্য করতে পারি?"
+                    "হ্যালো $bengaliTitle! আমি দারুণ আছি। আপনাকে কীভাবে সাহায্য করতে পারি?"
                 lower.contains("ব্যাটারি") || lower.contains("চার্জ") || lower.contains("battery") ->
-                    "ব্যাটারি ও ডিভাইস চমৎকার অবস্থায় রয়েছে।"
+                    "ব্যাটারি ও ডিভাইস একদম চমৎকার অবস্থায় রয়েছে, $bengaliTitle।"
                 else ->
-                    "কাজটি একদম রেডি করে দিয়েছি!"
+                    "কাজটি একদম রেডি করে দিয়েছি, $bengaliTitle!"
             }
         } else {
             when {
                 lower.contains("read screen") || lower.contains("screen") ->
-                    firstToolResult ?: "I've checked the active screen for you!"
+                    firstToolResult ?: "I've checked the active screen for you, $userTitle!"
                 lower.contains("click") || lower.contains("tap") ->
-                    "Clicked the button for you!"
+                    "Clicked the button for you, $userTitle!"
                 lower.contains("type") || lower.contains("enter") ->
-                    "Typed that in for you right away."
+                    "Typed that in for you right away, $userTitle."
                 lower.contains("scroll") ->
-                    "Scrolled the screen as requested."
+                    "Scrolled the screen as requested, $userTitle."
                 lower.contains("home") ->
-                    "Navigated back to home screen."
+                    "Navigated back to home screen, $userTitle."
                 lower.contains("back") ->
-                    "Navigated back for you."
+                    "Navigated back for you, $userTitle."
                 lower.contains("music") || lower.contains("song") || lower.contains("play") ->
-                    "Playing that for you right now!"
+                    "Playing that for you right now, $userTitle!"
                 lower.contains("open") || lower.contains("launch") || lower.contains("app") ->
-                    "Opened the app for you right away!"
+                    "Opened the app for you right away, $userTitle!"
                 lower.contains("remember") || lower.contains("note") || lower.contains("save") ->
-                    "Saved that note securely for you!"
+                    "Saved that note securely for you, $userTitle!"
                 lower.contains("how are") || lower.contains("hello") || lower.contains("hi") ->
-                    "Hello! I'm here and ready to help you."
+                    "Hello $userTitle! I'm here and ready to assist you right away."
                 lower.contains("battery") || lower.contains("status") ->
-                    "Your device and battery are running smoothly!"
+                    "Your device and battery are running smoothly, $userTitle!"
                 else ->
-                    "All taken care of for you!"
+                    "All taken care of for you, $userTitle!"
             }
         }
     }

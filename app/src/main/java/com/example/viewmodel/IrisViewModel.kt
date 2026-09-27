@@ -80,6 +80,22 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
     val isSpeaking = speechManager.isSpeaking
     val audioRmsDb = speechManager.audioRmsDb
     val handsFreeContinuous = speechManager.handsFreeContinuous
+    val voicePreset = speechManager.voicePreset
+
+    // AI Model Engine: Gemini 3.1 Flash Live (Default)
+    private val _audioEngineMode = MutableStateFlow(AudioEngineMode.DEFAULT)
+    val audioEngineMode: StateFlow<AudioEngineMode> = _audioEngineMode.asStateFlow()
+
+    // Personality Mode: Assistant Mode (Default)
+    private val _personalityMode = MutableStateFlow(PersonalityMode.DEFAULT)
+    val personalityMode: StateFlow<PersonalityMode> = _personalityMode.asStateFlow()
+
+    // Dynamic Addressing: Boss (Default)
+    private val _addressingMode = MutableStateFlow(AddressingMode.DEFAULT)
+    val addressingMode: StateFlow<AddressingMode> = _addressingMode.asStateFlow()
+
+    private val _customUserName = MutableStateFlow("")
+    val customUserName: StateFlow<String> = _customUserName.asStateFlow()
 
     private val _isAccessibilityActive = MutableStateFlow(nativeBridge.isAccessibilityActive())
     val isAccessibilityActive: StateFlow<Boolean> = _isAccessibilityActive.asStateFlow()
@@ -90,7 +106,7 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
             ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = MessageSender.AGENT,
-                text = "হ্যালো! আমি IRIS, আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী ও নির্ভরযোগ্য বন্ধু।\nহ্যান্ডস-ফ্রি মোড প্রস্তুত রয়েছে—যেকোনো কথা বা মোবাইল ডিভাইস নিয়ন্ত্রণের কমান্ড সরাসরি মুখে বলতে পারেন!",
+                text = "হ্যালো বস! আমি IRIS, আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী।\nGemini 3.1 Flash Live ইঞ্জিন ও হ্যান্ডস-ফ্রি মোড প্রস্তুত—যেকোনো কথা বা ডিভাইসের কাজ সরাসরি মুখে বলুন!",
                 agentType = AgentType.ORCHESTRATOR,
                 emotionTone = "বন্ধুসুলভ ও আন্তরিক"
             )
@@ -119,6 +135,30 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.runSwarmDiagnosticPulse()
         }
+    }
+
+    fun setVoicePreset(preset: GeminiVoicePreset) {
+        speechManager.setVoicePreset(preset)
+        nativeBridge.triggerHapticFeedback(false)
+    }
+
+    fun setAddressingMode(mode: AddressingMode) {
+        _addressingMode.value = mode
+        nativeBridge.triggerHapticFeedback(false)
+    }
+
+    fun setCustomUserName(name: String) {
+        _customUserName.value = name
+    }
+
+    fun setPersonalityMode(mode: PersonalityMode) {
+        _personalityMode.value = mode
+        nativeBridge.triggerHapticFeedback(false)
+    }
+
+    fun setAudioEngineMode(engine: AudioEngineMode) {
+        _audioEngineMode.value = engine
+        nativeBridge.triggerHapticFeedback(false)
     }
 
     fun setLanguage(language: AppLanguage) {
@@ -176,6 +216,11 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
                     prompt = trimmed,
                     language = _appLanguage.value,
                     apiKeyOverride = _customApiKey.value.takeIf { it.isNotBlank() },
+                    voicePreset = speechManager.voicePreset.value,
+                    addressingMode = _addressingMode.value,
+                    customUserName = _customUserName.value,
+                    personalityMode = _personalityMode.value,
+                    audioEngineMode = _audioEngineMode.value,
                     onStepUpdated = { dag ->
                         _currentActiveDag.value = dag
                     }

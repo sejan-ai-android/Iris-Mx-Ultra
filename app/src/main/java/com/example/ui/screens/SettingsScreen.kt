@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,7 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.AppLanguage
+import com.example.data.model.*
 import com.example.ui.theme.*
 import com.example.viewmodel.IrisViewModel
 
@@ -34,6 +35,11 @@ fun SettingsScreen(
     val recentLogs by viewModel.recentLogs.collectAsState()
     val handsFreeContinuous by viewModel.handsFreeContinuous.collectAsState()
     val isAccessibilityActive by viewModel.isAccessibilityActive.collectAsState()
+    val voicePreset by viewModel.voicePreset.collectAsState()
+    val addressingMode by viewModel.addressingMode.collectAsState()
+    val customUserName by viewModel.customUserName.collectAsState()
+    val personalityMode by viewModel.personalityMode.collectAsState()
+    val audioEngineMode by viewModel.audioEngineMode.collectAsState()
 
     var showKeyDialog by remember { mutableStateOf(false) }
     var keyInput by remember { mutableStateOf(customApiKey) }
@@ -60,6 +66,315 @@ fun SettingsScreen(
                 color = IrisTextMuted,
                 fontSize = 11.sp
             )
+        }
+
+        // Section 1: AI Model Engine (Default Configuration)
+        SettingSection(title = "AI MODEL ENGINE") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AudioEngineMode.entries.forEach { engine ->
+                    val isSelected = audioEngineMode == engine
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { viewModel.setAudioEngineMode(engine) }
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) IrisCyanPrimary else IrisBorder,
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                        color = if (isSelected) IrisSurfaceElevated else IrisSurface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = engine.title,
+                                        color = if (isSelected) IrisCyanPrimary else IrisTextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (engine.isLiveStreaming) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = IrisCyanPrimary.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = "DEFAULT",
+                                                color = IrisCyanPrimary,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = engine.description,
+                                    color = IrisTextMuted,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { viewModel.setAudioEngineMode(engine) },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = IrisCyanPrimary,
+                                    unselectedColor = IrisTextMuted
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 2: Voice Selection
+        SettingSection(title = "VOICE PRESET SELECTION") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Supported Profiles: Puck (Default), Charon, Kore, Fenrir, Aoede, Leda, Orus, Zephyr. Tap to preview pitch, modulation, and expressive tone.",
+                    color = IrisTextMuted,
+                    fontSize = 11.sp
+                )
+
+                GeminiVoicePreset.entries.forEach { preset ->
+                    val isSelected = voicePreset == preset
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                viewModel.setVoicePreset(preset)
+                                val previewGreeting = if (language == AppLanguage.BENGALI) {
+                                    "হ্যালো! আমি ${preset.voiceName}, আপনার ভয়েস প্রিসেট।"
+                                } else {
+                                    "Hello! I am ${preset.voiceName}, ready to assist you."
+                                }
+                                viewModel.speechManager.speak(previewGreeting)
+                            }
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) IrisEmeraldAccent else IrisBorder,
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                        color = if (isSelected) IrisSurfaceElevated else IrisSurface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = preset.voiceName,
+                                        color = if (isSelected) IrisEmeraldAccent else IrisTextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = IrisSurfaceVariant
+                                    ) {
+                                        Text(
+                                            text = preset.genderNote,
+                                            color = IrisVioletSecondary,
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    if (preset == GeminiVoicePreset.DEFAULT) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = IrisEmeraldAccent.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = "DEFAULT",
+                                                color = IrisEmeraldAccent,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = preset.toneDescription,
+                                    color = IrisTextMuted,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = "Pitch: ${preset.pitch}x • Speed: ${preset.speed}x",
+                                    color = IrisTextMuted.copy(alpha = 0.7f),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    viewModel.setVoicePreset(preset)
+                                    val previewGreeting = if (language == AppLanguage.BENGALI) {
+                                        "হ্যালো! আমি ${preset.voiceName}, আপনার ভয়েস প্রিসেট।"
+                                    } else {
+                                        "Hello! I am ${preset.voiceName}, ready to assist you."
+                                    }
+                                    viewModel.speechManager.speak(previewGreeting)
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = IrisEmeraldAccent,
+                                    unselectedColor = IrisTextMuted
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 3: Personality & User Addressing
+        SettingSection(title = "PERSONALITY & BEHAVIOR MODE") {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Personality Mode
+                PersonalityMode.entries.forEach { mode ->
+                    val isSelected = personalityMode == mode
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { viewModel.setPersonalityMode(mode) }
+                            .border(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) IrisVioletSecondary else IrisBorder,
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                        color = if (isSelected) IrisSurfaceElevated else IrisSurface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = mode.title,
+                                        color = if (isSelected) IrisVioletSecondary else IrisTextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (mode == PersonalityMode.DEFAULT) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = IrisVioletSecondary.copy(alpha = 0.2f)
+                                        ) {
+                                            Text(
+                                                text = "DEFAULT",
+                                                color = IrisVioletSecondary,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = mode.description,
+                                    color = IrisTextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { viewModel.setPersonalityMode(mode) },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = IrisVioletSecondary,
+                                    unselectedColor = IrisTextMuted
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Dynamic Addressing
+                Text(
+                    text = "DYNAMIC ADDRESSING TITLE:",
+                    color = IrisCyanPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AddressingMode.entries.forEach { mode ->
+                        val isSelected = addressingMode == mode
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.setAddressingMode(mode) }
+                                .border(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) IrisCyanPrimary else IrisBorder,
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            color = if (isSelected) IrisCyanPrimary.copy(alpha = 0.15f) else IrisSurfaceElevated
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    color = if (isSelected) IrisCyanPrimary else IrisTextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (addressingMode == AddressingMode.CUSTOM) {
+                    OutlinedTextField(
+                        value = customUserName,
+                        onValueChange = { viewModel.setCustomUserName(it) },
+                        label = { Text("Enter your custom name / title", fontSize = 11.sp) },
+                        placeholder = { Text("e.g. Delta, Commander, Alex") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = IrisCyanPrimary,
+                            unfocusedBorderColor = IrisBorder,
+                            focusedTextColor = IrisTextPrimary,
+                            unfocusedTextColor = IrisTextPrimary
+                        )
+                    )
+                }
+            }
         }
 
         // Section: Language Mode
