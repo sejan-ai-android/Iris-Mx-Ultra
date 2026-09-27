@@ -52,17 +52,15 @@ fun CriticInterceptorDialog(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "CRITIC-AGENT INTERCEPT",
-                    color = IrisAlertRed,
+                    text = "নিরাপত্তা নিশ্চিতকরণ",
+                    color = IrisCyanPrimary,
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "POLICY LEVEL-4 SAFETY INTERVENTION",
-                    color = IrisHazardAmber,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "আপনার তথ্যের সুরক্ষার্থে একটি বিনীত সতর্কতা",
+                    color = IrisTextMuted,
+                    fontSize = 11.sp
                 )
             }
         },
@@ -84,17 +82,17 @@ fun CriticInterceptorDialog(
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text(
-                            text = "COMMAND PAYLOAD:",
+                            text = "অনুরোধের বিবরণ:",
                             color = IrisTextMuted,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = warning.commandPayload,
+                            text = warning.actionName,
                             color = IrisCyanPrimary,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -104,15 +102,16 @@ fun CriticInterceptorDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Warning",
-                        tint = IrisHazardAmber,
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = "Safe Shield",
+                        tint = IrisEmeraldAccent,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Destructive execution halted. Explicit Commander authorization required.",
+                        text = "আপনার স্পষ্ট অনুমোদন ছাড়া কোনো ডাটা মুছে ফেলা বা পরিবর্তন করা হবে না।",
                         color = IrisTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     )
                 }
             }
@@ -127,7 +126,7 @@ fun CriticInterceptorDialog(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.testTag("confirm_critic_action_button")
             ) {
-                Text("AUTHORIZE & EXECUTE", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("হ্যাঁ, এগিয়ে যান", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         },
         dismissButton = {
@@ -137,7 +136,7 @@ fun CriticInterceptorDialog(
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = IrisTextSecondary),
                 modifier = Modifier.testTag("dismiss_critic_action_button")
             ) {
-                Text("ABORT OPERATION", fontSize = 12.sp)
+                Text("না, বাতিল করুন", fontSize = 12.sp)
             }
         }
     )

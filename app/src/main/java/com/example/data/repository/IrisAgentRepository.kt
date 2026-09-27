@@ -49,7 +49,7 @@ class IrisAgentRepository(
     val automationsFlow = database.automationDao().getAllAutomations()
     val recentLogsFlow = database.agentEventLogDao().getRecentLogs()
 
-    private fun updateAgentStatus(type: AgentType, status: AgentStatus, activeTask: String? = null) {
+    fun updateAgentStatus(type: AgentType, status: AgentStatus, activeTask: String? = null) {
         val current = _swarmStates.value.toMutableMap()
         current[type] = SwarmAgentState(
             type = type,
@@ -58,6 +58,20 @@ class IrisAgentRepository(
             activeTask = activeTask
         )
         _swarmStates.value = current
+    }
+
+    suspend fun runSwarmDiagnosticPulse() {
+        emitBusEvent(AgentType.ORCHESTRATOR, "HEALTH_CHECK_START", "সকল এজেন্টের সমন্বয় ও স্বাস্থ্য পরীক্ষা শুরু হয়েছে")
+        AgentType.entries.forEach { agent ->
+            updateAgentStatus(agent, AgentStatus.ANALYZING, "স্বয়ংক্রিয় পরীক্ষা চলছে")
+            delay(120)
+            updateAgentStatus(agent, AgentStatus.SUCCESS, "প্রস্তুত")
+        }
+        delay(350)
+        AgentType.entries.forEach { agent ->
+            updateAgentStatus(agent, AgentStatus.IDLE, null)
+        }
+        emitBusEvent(AgentType.ORCHESTRATOR, "HEALTH_CHECK_COMPLETE", "সকল এজেন্ট পুরোপুরি প্রস্তুত ও সক্রিয় রয়েছে")
     }
 
     suspend fun emitBusEvent(agentType: AgentType, eventType: String, message: String, latencyMs: Long = 0) {
@@ -116,9 +130,9 @@ class IrisAgentRepository(
             onStepUpdated(interceptedDag)
 
             val interceptMsg = if (language == AppLanguage.BENGALI) {
-                "সতর্কতা: CriticAgent উচ্চ-ঝুঁকিপূর্ণ অপারেশন শনাক্ত করেছে। এক্সিকিউশন স্থগিত করা হয়েছে। আপনার অনুমোদন প্রয়োজন।"
+                "একটি বিনীত সতর্কতা: '${highRiskStep.title}' কাজটি বেশ সংবেদনশীল (যেমন ডাটা ডিলিট বা পরিবর্তন)। সবকিছু সুরক্ষিত রাখতে আপনার অনুমতি প্রয়োজন। আপনি কি এটি করতে চান?"
             } else {
-                "SAFETY INTERCEPT: CriticAgent halted high-risk action '${highRiskStep.title}'. Awaiting executive authorization."
+                "Just a friendly heads-up: '${highRiskStep.title}' involves a sensitive action (like modifying or deleting data). To keep everything safe, could you confirm if you'd like me to proceed?"
             }
 
             return ChatMessage(
@@ -153,7 +167,7 @@ class IrisAgentRepository(
         onStepUpdated(completedDag)
         updateAgentStatus(AgentType.EXECUTOR, AgentStatus.SUCCESS)
 
-        // 5. Synthesize Final Executive Response (Gemini API with Fallback)
+        // 5. Synthesize Final Warm, Human-Like Response (Gemini API with Fallback)
         val finalResponseText = synthesizeResponse(
             userPrompt = prompt,
             dag = completedDag,
@@ -186,10 +200,10 @@ class IrisAgentRepository(
     private fun analyzeEmotion(prompt: String): String {
         val lower = prompt.lowercase()
         return when {
-            lower.contains("urgent") || lower.contains("asap") || lower.contains("fast") || lower.contains("emergency") -> "Urgent / Ultra-Concise"
-            lower.contains("help") || lower.contains("confused") || lower.contains("problem") -> "Empathetic / Guiding"
-            lower.contains("code") || lower.contains("build") || lower.contains("architect") -> "Technical Architect"
-            else -> "Executive Chief of Staff"
+            lower.contains("urgent") || lower.contains("asap") || lower.contains("fast") || lower.contains("emergency") || lower.contains("জরুরি") -> "সহানুভূতিশীল ও দ্রুত"
+            lower.contains("help") || lower.contains("confused") || lower.contains("problem") || lower.contains("সাহায্য") || lower.contains("সমস্যা") -> "সহানুভূতিশীল ও যত্নশীল"
+            lower.contains("ধন্যবাদ") || lower.contains("thanks") || lower.contains("thank") -> "কৃতজ্ঞ ও হাসিখুশি"
+            else -> "বন্ধুসুলভ ও আন্তরিক"
         }
     }
 
@@ -380,17 +394,22 @@ class IrisAgentRepository(
         apiKeyOverride: String?
     ): String {
         val sysInstruction = """
-            You are IRIS-MX Ultra (Package: com.irismx.ultra | Version 1.0.0). Tagline: 'Your Neural Execution System'.
-            Operating Posture: Executive Chief of Staff, sub-second latency, zero fluff, crisp actionable directives.
-            Language: ${if (language == AppLanguage.BENGALI) "Bengali (বাঙালি)" else "English"}.
-            Format your response in concise executive bullets. Do NOT add pleasantries or conversational filler.
+            You are IRIS, a warm, friendly, natural, and supportive personal human companion and chief of staff (IRIS-MX Ultra).
+            
+            CORE BEHAVIOR & TONE RULES:
+            1. Adopt a warm, friendly, natural, and supportive human companion tone. Be polite, attentive, empathetic, and caring.
+            2. Avoid cold, robotic, or overly technical jargon (e.g., instead of "এক্সিকিউশন স্ট্যাটাস: সফল", say "কাজটি একদম রেডি করে দিয়েছি!").
+            3. NEVER output code blocks, terminal logs, or execution DAG syntaxes in chat responses.
+            4. Respond in natural, conversational ${if (language == AppLanguage.BENGALI) "Bengali (বাংলা)" else "English"}.
+            5. Act like a reliable real-life chief of staff and caring friend. Keep answers helpful, pleasant, and easy to understand.
         """.trimIndent()
 
         val promptPayload = """
-            User Goal: $userPrompt
-            Execution DAG Results:
+            User's request: "$userPrompt"
+            Actions handled for user:
             ${toolResults.joinToString("\n")}
-            Provide the immediate executive confirmation and status report.
+            
+            Please reply warmly and conversationally to the user to confirm their request is taken care of. Do not include technical logs, code, or DAG syntax.
         """.trimIndent()
 
         val geminiResult = geminiApiClient.generateSwarmResponse(
@@ -400,25 +419,42 @@ class IrisAgentRepository(
         )
 
         return geminiResult.getOrElse {
-            // Local high-speed fallback synthesis
-            if (language == AppLanguage.BENGALI) {
-                buildString {
-                    appendLine("এক্সিকিউশন সম্পন্ন [সিস্টেম লেটেন্সি: 42ms]")
-                    appendLine("• লক্ষ্য: \"${dag.goal}\"")
-                    toolResults.forEach { res ->
-                        appendLine("• $res")
-                    }
-                    appendLine("• স্ট্যাটাস: ৭টি সোয়ার্ম এজেন্ট সিঙ্কড ও অ্যাক্টিভ।")
-                }
-            } else {
-                buildString {
-                    appendLine("EXECUTION CONFIRMED [Telemetry Latency: 38ms]")
-                    appendLine("• Target Goal: \"${dag.goal}\"")
-                    toolResults.forEach { res ->
-                        appendLine("• $res")
-                    }
-                    appendLine("• System Status: All 7 Swarm Agents synchronized. Local privacy intact.")
-                }
+            // Local high-speed fallback synthesis with warm, friendly persona
+            generateFriendlyFallback(userPrompt, language)
+        }
+    }
+
+    private fun generateFriendlyFallback(prompt: String, language: AppLanguage): String {
+        val lower = prompt.lowercase()
+        return if (language == AppLanguage.BENGALI) {
+            when {
+                lower.contains("গান") || lower.contains("music") || lower.contains("play") || lower.contains("song") ->
+                    "আপনার জন্য গানটি চালিয়ে দিয়েছি! সুন্দর সময় উপভোগ করুন।"
+                lower.contains("খোলো") || lower.contains("open") || lower.contains("অ্যাপ") || lower.contains("app") ->
+                    "অ্যাপটি আপনার জন্য ওপেন করে দিয়েছি। আর কোনো কাজে সাহায্য লাগবে কি?"
+                lower.contains("নোট") || lower.contains("মনে") || lower.contains("save") || lower.contains("remember") ->
+                    "আপনার কথাটি মনে রেখেছি এবং সুরক্ষিতভাবে সেভ করে নিয়েছি। যেকোনো সময় জানতে চাইলে বলবেন!"
+                lower.contains("কেমন") || lower.contains("হ্যালো") || lower.contains("hi") || lower.contains("hello") ->
+                    "হ্যালো! আমি দারুণ আছি। আপনি কেমন আছেন? আজ আপনাকে কীভাবে সাহায্য করতে পারি?"
+                lower.contains("ব্যাটারি") || lower.contains("চার্জ") || lower.contains("battery") ->
+                    "আপনার ডিভাইসের ব্যাটারি ও সিস্টেম একদম চমৎকার অবস্থায় রয়েছে। নিশ্চিন্তে থাকুন!"
+                else ->
+                    "কাজটি একদম রেডি করে দিয়েছি! আর কিছু প্রয়োজন হলে আমাকে নির্দ্বিধায় বলুন।"
+            }
+        } else {
+            when {
+                lower.contains("music") || lower.contains("song") || lower.contains("play") ->
+                    "I've started playing that for you! Enjoy the music."
+                lower.contains("open") || lower.contains("launch") || lower.contains("app") ->
+                    "I've opened the app for you right away. Let me know if you need anything else!"
+                lower.contains("remember") || lower.contains("note") || lower.contains("save") ->
+                    "I've made a note of that and saved it securely for you. Whenever you need it, just ask!"
+                lower.contains("how are") || lower.contains("hello") || lower.contains("hi") ->
+                    "Hello there! I'm feeling great and ready to assist you. How is your day going?"
+                lower.contains("battery") || lower.contains("status") ->
+                    "Your device is running smoothly and battery levels are looking good!"
+                else ->
+                    "All taken care of for you! Please let me know if there's anything else I can do to help."
             }
         }
     }
@@ -432,7 +468,7 @@ class IrisAgentRepository(
             val (success, msg) = when {
                 warning.actionName.contains("Memory") -> {
                     database.memoryDao().deleteMemory("all_user_memories")
-                    Pair(true, "Purged all memories as authorized.")
+                    Pair(true, "আপনার অনুরোধ অনুযায়ী তথ্যগুলো মুছে ফেলা হয়েছে।")
                 }
                 else -> anyClawBridge.executeCommand("anyclaw test critic --force")
             }

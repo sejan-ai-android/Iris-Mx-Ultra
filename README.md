@@ -136,36 +136,30 @@ The swarm executes native actions through structured JSON tool bindings:
 
 ## ✨ Key Screens & Features
 
-### 1. Swarm Status Monitor (`Swarm Matrix`)
+### 1. Swarm Status Monitor (`এজেন্ট টিম` - Swarm Matrix)
 - **Interactive Radial Mesh Graph:** Real-time visual network of all 7 agents with glowing dynamic synapse conduits.
 - **Live Status Badges:** Reflects `IDLE`, `ANALYZING`, `PLANNING`, `EXECUTING`, `INTERCEPTING`, and `SUCCESS`.
-- **Diagnostic Pulse Self-Test:** One-tap health sweep dispatching diagnostic signals across the event bus.
-- **Hardware Telemetry Breakdown:** Real-time CPU allocation %, allocated memory cache (KB), queue depth, and clearance mode.
+- **Diagnostic Pulse Self-Test:** One-tap health sweep dispatching diagnostic signals across the shared event bus.
+- **Hardware Telemetry Breakdown:** Real-time CPU allocation %, allocated memory cache (KB), queue depth, and status indicators.
 
-### 2. Voice & Orchestration HUD (`Voice HUD`)
+### 2. Warm & Natural Voice Assistant (`সহকারী` - Voice HUD)
 - **Holographic Neural Orb:** Multi-layer animated cybernetic iris reacting dynamically to speech recognition (`SpeechRecognizer`), reasoning state, and TTS audio RMS levels.
 - **Reactive Audio Waveform:** Real-time animated audio spectrum visualizer.
-- **DAG Execution Cards:** Live step-by-step progress cards showing active tool invocations and sub-second latencies.
-- **Bilingual Voice Engine:** Executive English and Bengali (`বাংলা`) with automatic TextToSpeech speech synthesis.
+- **Conversational Chief of Staff:** Warm, friendly, supportive human companion tone in both Bengali and English. Zero robotic jargon, code syntax, or raw DAG dumps in standard responses.
+- **Bilingual Voice Engine:** Executive English and Bengali (`বাংলা`) with automatic TextToSpeech voice synthesis.
 
-### 3. Code Generation Engine (`Code Engine`)
-- Complete production code deliverables for:
-  - **TypeScript (React Native / Expo):** `IrisMultiAgentSwarm.ts`, `AnyClawBridge.ts`, `CriticSafetyInterceptor.ts`.
-  - **Kotlin (Android Native):** `IrisOrchestrator.kt`, `NativeDeviceBridge.kt`, `SafetyCriticValidator.kt`.
-- Syntax formatting, line numbers, one-tap clipboard copy with haptic feedback, and an interactive prompt-to-code generator.
-
-### 4. Memory & Knowledge Graph (`Knowledge`)
+### 3. Memory & Knowledge Graph (`নোট ও মেমরি` - Knowledge)
 - Local-first encrypted Room Database (`iris_mx_ultra.db`).
-- Vector cosine similarity search over stored user and system memory nodes.
+- Vector cosine similarity search over stored user notes and knowledge nodes.
 - Pre-seeded root entities, operational postures, and clearance policies.
 
-### 5. Hardware Telemetry & Automations (`Telemetry`)
+### 4. Hardware Telemetry & Automations (`ডিভাইস যত্ন` - Telemetry)
 - Live system battery tracking, charging state, and battery-triggered routine dispatch.
-- Audio volume session controls and network link profiling (WiFi 6E, 5G Sub-6 NSA, Gigabit ETH).
+- Audio volume session controls and network link profiling.
 - Scheduled automations engine with time, battery, and location triggers.
 
-### 6. Safety & Security (`Core Config`)
-- **CriticAgent Level-4 Interceptor Modal:** Intercepts high-risk operations (e.g. data wipes, system config alterations) with interactive authorize/abort dialogs.
+### 5. Safety & Care (`নিরাপত্তা নিশ্চিতকরণ` - CriticAgent)
+- **CriticAgent Safety Care Modal:** Intercepts high-risk operations (e.g. data wipes, system config alterations) with interactive, polite authorize/abort confirmation dialogs.
 - **Secrets & API Management:** Built with Secrets Gradle Plugin; supports Gemini 3.5 Flash with automatic offline neural fallback.
 
 ---

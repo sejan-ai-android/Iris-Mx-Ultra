@@ -95,7 +95,7 @@ fun IrisMainApp(viewModel: IrisViewModel) {
         ) {
             when (currentTab) {
                 IrisNavigationTab.ORCHESTRATION -> OrchestrationScreen(viewModel = viewModel)
-                IrisNavigationTab.CODE_GEN -> CodeGenScreen(viewModel = viewModel)
+                IrisNavigationTab.SWARM_MONITOR -> SwarmStatusMonitorScreen(viewModel = viewModel)
                 IrisNavigationTab.MEMORY_GRAPH -> MemoryGraphScreen(viewModel = viewModel)
                 IrisNavigationTab.TELEMETRY_AUTOMATIONS -> TelemetryAutomationsScreen(viewModel = viewModel)
                 IrisNavigationTab.SETTINGS -> SettingsScreen(viewModel = viewModel)
@@ -118,9 +118,9 @@ enum class NavigationItemData(
     val label: String,
     val icon: ImageVector
 ) {
-    ORCHESTRATION(IrisNavigationTab.ORCHESTRATION, "Swarm HUD", Icons.Default.Hub),
-    CODE_GEN(IrisNavigationTab.CODE_GEN, "Code Engine", Icons.Default.Code),
-    MEMORY_GRAPH(IrisNavigationTab.MEMORY_GRAPH, "Memory Graph", Icons.Default.AccountTree),
-    TELEMETRY(IrisNavigationTab.TELEMETRY_AUTOMATIONS, "Telemetry", Icons.Default.Sensors),
-    SETTINGS(IrisNavigationTab.SETTINGS, "Core Config", Icons.Default.Settings)
+    ORCHESTRATION(IrisNavigationTab.ORCHESTRATION, "সহকারী", Icons.Default.Chat),
+    SWARM_MONITOR(IrisNavigationTab.SWARM_MONITOR, "এজেন্ট টিম", Icons.Default.Hub),
+    MEMORY_GRAPH(IrisNavigationTab.MEMORY_GRAPH, "নোট ও মেমরি", Icons.Default.BookmarkBorder),
+    TELEMETRY(IrisNavigationTab.TELEMETRY_AUTOMATIONS, "ডিভাইস যত্ন", Icons.Default.Sensors),
+    SETTINGS(IrisNavigationTab.SETTINGS, "সেটিংস", Icons.Default.Settings)
 }

@@ -100,11 +100,11 @@ fun OrchestrationScreen(
                         containerColor = IrisCyanPrimary.copy(alpha = 0.2f),
                         contentColor = IrisCyanPrimary
                     ) {
-                        Text("v1.0.0", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("Companion", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Text(
-                    text = "Your Neural Execution System",
+                    text = if (language == AppLanguage.BENGALI) "আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী" else "Your Personal Assistant & Companion",
                     color = IrisTextMuted,
                     fontSize = 11.sp
                 )
@@ -130,7 +130,7 @@ fun OrchestrationScreen(
                     )
                 }
 
-                // Latency Badge
+                // Ready Badge
                 Surface(
                     modifier = Modifier.clip(RoundedCornerShape(12.dp)),
                     color = IrisSurfaceVariant
@@ -140,14 +140,14 @@ fun OrchestrationScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = "Latency",
-                            tint = IrisEmeraldAccent,
-                            modifier = Modifier.size(12.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(IrisEmeraldAccent)
                         )
                         Text(
-                            text = "<1s Sub-sec",
+                            text = if (language == AppLanguage.BENGALI) "প্রস্তুত" else "Ready",
                             color = IrisEmeraldAccent,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -156,9 +156,6 @@ fun OrchestrationScreen(
                 }
             }
         }
-
-        // Swarm Agents Matrix Bar
-        AgentSwarmBar(states = swarmStates)
 
         // Center Hero Neural Orb & Reactive Audio Wave
         Column(
@@ -187,10 +184,10 @@ fun OrchestrationScreen(
             // State caption
             Text(
                 text = when {
-                    isListening -> "LISTENING... (TAP TO TRANSMIT)"
-                    isProcessing -> "SWARM REASONING IN PROGRESS..."
-                    isSpeaking -> "NEURAL TTS OUTPUT TRANSMITTING"
-                    else -> "VOICE READY • TAP ORB OR MIC TO SPEAK"
+                    isListening -> if (language == AppLanguage.BENGALI) "আপনাকে শুনছি... বলুন" else "Listening to you... speak naturally"
+                    isProcessing -> if (language == AppLanguage.BENGALI) "আপনার অনুরোধ নিয়ে কাজ করছি..." else "Working on your request..."
+                    isSpeaking -> if (language == AppLanguage.BENGALI) "উত্তর দিচ্ছি..." else "Speaking..."
+                    else -> if (language == AppLanguage.BENGALI) "ভয়েস বা টেক্সটে যেকোনো কথা বলতে পারেন" else "Tap orb or mic to speak with Iris"
                 },
                 color = when {
                     isListening -> IrisAlertRed
@@ -212,79 +209,34 @@ fun OrchestrationScreen(
             )
         }
 
-        // Active Execution DAG Card (if present)
-        AnimatedVisibility(visible = currentDag != null) {
-            currentDag?.let { dag ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = IrisSurfaceElevated),
-                    shape = RoundedCornerShape(12.dp),
-                    border = CardDefaults.outlinedCardBorder().copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(IrisBorder)
-                    )
+        // Active Working Card (Friendly & Clean, No DAG Syntax)
+        AnimatedVisibility(visible = isProcessing) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                color = IrisSurfaceElevated,
+                shape = RoundedCornerShape(12.dp),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = androidx.compose.ui.graphics.SolidColor(IrisBorder)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountTree,
-                                contentDescription = "DAG",
-                                tint = IrisCyanPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "ACTIVE EXECUTION DAG: ${dag.goal.take(28)}...",
-                                color = IrisTextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        dag.steps.forEach { step ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = when (step.status) {
-                                        StepStatus.COMPLETED -> Icons.Default.CheckCircle
-                                        StepStatus.RUNNING -> Icons.Default.Sync
-                                        StepStatus.INTERCEPTED_BY_CRITIC -> Icons.Default.Shield
-                                        StepStatus.FAILED -> Icons.Default.Cancel
-                                        StepStatus.PENDING -> Icons.Default.HourglassEmpty
-                                    },
-                                    contentDescription = step.status.name,
-                                    tint = when (step.status) {
-                                        StepStatus.COMPLETED -> IrisEmeraldAccent
-                                        StepStatus.RUNNING -> IrisCyanPrimary
-                                        StepStatus.INTERCEPTED_BY_CRITIC -> IrisAlertRed
-                                        StepStatus.FAILED -> IrisAlertRed
-                                        StepStatus.PENDING -> IrisTextMuted
-                                    },
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = step.title,
-                                    color = IrisTextPrimary,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Text(
-                                    text = step.toolName,
-                                    color = IrisTextMuted,
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
-                        }
-                    }
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = IrisCyanPrimary
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BENGALI) "আপনার কাজটি দ্রুত ও সুন্দরভাবে প্রস্তুত করা হচ্ছে..." else "Taking care of your request...",
+                        color = IrisTextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -311,7 +263,7 @@ fun OrchestrationScreen(
             }
         }
 
-        // Quick Suggestion Chips
+        // Quick Suggestion Chips (Warm & Friendly)
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -319,13 +271,20 @@ fun OrchestrationScreen(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val suggestions = listOf(
-                "Play music on Spotify",
-                "AnyClaw device status",
-                "Wipe memory cache (Test Critic)",
-                "Create battery automation",
-                "Remember audio profile",
-                "Status check & telemetry"
+            val suggestions = if (language == AppLanguage.BENGALI) listOf(
+                "একটি সুন্দর গান শোনাও 🎵",
+                "আজকের দিনটি কেমন যাবে? ☀️",
+                "একটি গুরুত্বপূর্ণ নোট মনে রাখো 📝",
+                "ডিভাইসের যত্ন ও ব্যাটারি চেক 🔋",
+                "কেমন আছো আইরিস? 👋",
+                "Play calming music 🎧"
+            ) else listOf(
+                "Play relaxing music 🎵",
+                "How is my day looking? ☀️",
+                "Save a quick note for me 📝",
+                "Check device care & battery 🔋",
+                "How are you doing today? 👋",
+                "Open settings ⚙️"
             )
             items(suggestions) { chipText ->
                 SuggestionChip(
@@ -385,7 +344,7 @@ fun OrchestrationScreen(
                     onValueChange = { viewModel.setInputText(it) },
                     placeholder = {
                         Text(
-                            text = if (language == AppLanguage.BENGALI) "ভয়েস কমান্ড বা নির্দেশ টাইপ করুন..." else "Transmitting directive to neural swarm...",
+                            text = if (language == AppLanguage.BENGALI) "আইরিসকে যেকোনো কথা বা কাজের অনুরোধ বলুন..." else "Ask or request anything from Iris...",
                             color = IrisTextMuted,
                             fontSize = 13.sp
                         )

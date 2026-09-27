@@ -16,8 +16,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 enum class IrisNavigationTab {
+    SWARM_MONITOR,
     ORCHESTRATION,
-    CODE_GEN,
     MEMORY_GRAPH,
     TELEMETRY_AUTOMATIONS,
     SETTINGS
@@ -60,7 +60,7 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
     private val _telemetry = MutableStateFlow(nativeBridge.readTelemetry())
     val telemetry: StateFlow<TelemetryData> = _telemetry.asStateFlow()
 
-    private val _appLanguage = MutableStateFlow(AppLanguage.ENGLISH)
+    private val _appLanguage = MutableStateFlow(AppLanguage.BENGALI)
     val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
 
     private val _customApiKey = MutableStateFlow("")
@@ -81,15 +81,14 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
     val audioRmsDb = speechManager.audioRmsDb
 
     init {
-        // Initial welcome message
+        // Initial warm, human-like welcome message
         _messages.value = listOf(
             ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = MessageSender.AGENT,
-                text = "IRIS-MX Ultra Neural Execution Core v1.0.0 active.\n7 Swarm Agents synchronized. Ready for voice or directive input.",
+                text = "হ্যালো! আমি IRIS, আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী ও নির্ভরযোগ্য বন্ধু।\nআজকে আপনাকে কীভাবে সাহায্য করতে পারি? গান শোনা, গুরুত্বপূর্ণ তথ্য মনে রাখা, কিংবা যেকোনো কাজের কথা আমাকে নির্দ্বিধায় বলতে পারেন।",
                 agentType = AgentType.ORCHESTRATOR,
-                latencyMs = 18,
-                emotionTone = "Executive Chief of Staff"
+                emotionTone = "বন্ধুসুলভ ও আন্তরিক"
             )
         )
 
@@ -109,6 +108,12 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setInputText(text: String) {
         _inputText.value = text
+    }
+
+    fun triggerSwarmDiagnosticPulse() {
+        viewModelScope.launch {
+            repository.runSwarmDiagnosticPulse()
+        }
     }
 
     fun setLanguage(language: AppLanguage) {
@@ -166,11 +171,17 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
                     speechManager.speak(agentResponse.text)
                 }
             } catch (e: Exception) {
+                val errorMsgText = if (_appLanguage.value == AppLanguage.BENGALI) {
+                    "দুঃখিত, কাজটি করার সময় একটু সমস্যা দেখা দিয়েছে। তবে চিন্তা করবেন না, আপনি চাইলে আমি আবার চেষ্টা করতে পারি!"
+                } else {
+                    "I ran into a small hiccup while handling that for you. Don't worry, feel free to try again!"
+                }
                 val errorMsg = ChatMessage(
                     id = UUID.randomUUID().toString(),
                     sender = MessageSender.AGENT,
-                    text = "System fault: ${e.message}",
-                    agentType = AgentType.ORCHESTRATOR
+                    text = errorMsgText,
+                    agentType = AgentType.ORCHESTRATOR,
+                    emotionTone = "সহানুভূতিশীল"
                 )
                 _messages.value = _messages.value + errorMsg
             } finally {
@@ -182,12 +193,18 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmCriticAction() {
         nativeBridge.triggerHapticFeedback(true)
         repository.confirmCriticWarning {
-            // Update messages with approval notice
+            // Update messages with warm, friendly approval notice
+            val msgText = if (_appLanguage.value == AppLanguage.BENGALI) {
+                "আপনার নির্দেশ অনুযায়ী কাজটি নিরাপদে সম্পন্ন করে দিয়েছি! আর কিছু করতে হবে কি?"
+            } else {
+                "I've safely taken care of that for you as confirmed! Anything else you need?"
+            }
             val msg = ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = MessageSender.AGENT,
-                text = "CRITIC AUTHORIZED: High-risk action successfully executed by Commander override.",
-                agentType = AgentType.CRITIC
+                text = msgText,
+                agentType = AgentType.CRITIC,
+                emotionTone = "সহায়তাকারী ও যত্নশীল"
             )
             _messages.value = _messages.value + msg
         }
