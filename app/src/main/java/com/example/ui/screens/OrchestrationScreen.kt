@@ -1,0 +1,545 @@
+package com.example.ui.screens
+
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.example.data.model.*
+import com.example.ui.components.*
+import com.example.ui.theme.*
+import com.example.viewmodel.IrisViewModel
+import kotlinx.coroutines.launch
+
+@Composable
+fun OrchestrationScreen(
+    viewModel: IrisViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    val messages by viewModel.messages.collectAsState()
+    val isProcessing by viewModel.isProcessing.collectAsState()
+    val isListening by viewModel.isListening.collectAsState()
+    val isSpeaking by viewModel.isSpeaking.collectAsState()
+    val audioRmsDb by viewModel.audioRmsDb.collectAsState()
+    val swarmStates by viewModel.swarmStates.collectAsState()
+    val currentDag by viewModel.currentActiveDag.collectAsState()
+    val inputText by viewModel.inputText.collectAsState()
+    val language by viewModel.appLanguage.collectAsState()
+    val telemetry by viewModel.telemetry.collectAsState()
+
+    // Permission launcher for RECORD_AUDIO
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.toggleListening()
+        }
+    }
+
+    // Scroll to bottom when messages change
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(IrisBackground)
+    ) {
+        // Top Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "IRIS-MX ULTRA",
+                        color = IrisCyanPrimary,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
+                    )
+                    Badge(
+                        containerColor = IrisCyanPrimary.copy(alpha = 0.2f),
+                        contentColor = IrisCyanPrimary
+                    ) {
+                        Text("v1.0.0", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text(
+                    text = "Your Neural Execution System",
+                    color = IrisTextMuted,
+                    fontSize = 11.sp
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Language badge
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            val nextLang = if (language == AppLanguage.ENGLISH) AppLanguage.BENGALI else AppLanguage.ENGLISH
+                            viewModel.setLanguage(nextLang)
+                        },
+                    color = IrisSurfaceVariant
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.ENGLISH) "EN" else "বাংলা",
+                        color = IrisCyanPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Latency Badge
+                Surface(
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp)),
+                    color = IrisSurfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "Latency",
+                            tint = IrisEmeraldAccent,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "<1s Sub-sec",
+                            color = IrisEmeraldAccent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Swarm Agents Matrix Bar
+        AgentSwarmBar(states = swarmStates)
+
+        // Center Hero Neural Orb & Reactive Audio Wave
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            NeuralOrbVisualizer(
+                size = 110.dp,
+                isListening = isListening,
+                isProcessing = isProcessing,
+                isSpeaking = isSpeaking,
+                audioRmsDb = audioRmsDb,
+                onClick = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        viewModel.toggleListening()
+                    } else {
+                        recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // State caption
+            Text(
+                text = when {
+                    isListening -> "LISTENING... (TAP TO TRANSMIT)"
+                    isProcessing -> "SWARM REASONING IN PROGRESS..."
+                    isSpeaking -> "NEURAL TTS OUTPUT TRANSMITTING"
+                    else -> "VOICE READY • TAP ORB OR MIC TO SPEAK"
+                },
+                color = when {
+                    isListening -> IrisAlertRed
+                    isProcessing -> IrisVioletSecondary
+                    isSpeaking -> IrisEmeraldAccent
+                    else -> IrisTextMuted
+                },
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+
+            // Audio Waveform Bar
+            AudioWaveformBar(
+                isActive = isListening,
+                isSpeaking = isSpeaking,
+                audioRmsDb = audioRmsDb,
+                modifier = Modifier.padding(horizontal = 40.dp, vertical = 4.dp)
+            )
+        }
+
+        // Active Execution DAG Card (if present)
+        AnimatedVisibility(visible = currentDag != null) {
+            currentDag?.let { dag ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = IrisSurfaceElevated),
+                    shape = RoundedCornerShape(12.dp),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(IrisBorder)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountTree,
+                                contentDescription = "DAG",
+                                tint = IrisCyanPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "ACTIVE EXECUTION DAG: ${dag.goal.take(28)}...",
+                                color = IrisTextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        dag.steps.forEach { step ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = when (step.status) {
+                                        StepStatus.COMPLETED -> Icons.Default.CheckCircle
+                                        StepStatus.RUNNING -> Icons.Default.Sync
+                                        StepStatus.INTERCEPTED_BY_CRITIC -> Icons.Default.Shield
+                                        StepStatus.FAILED -> Icons.Default.Cancel
+                                        StepStatus.PENDING -> Icons.Default.HourglassEmpty
+                                    },
+                                    contentDescription = step.status.name,
+                                    tint = when (step.status) {
+                                        StepStatus.COMPLETED -> IrisEmeraldAccent
+                                        StepStatus.RUNNING -> IrisCyanPrimary
+                                        StepStatus.INTERCEPTED_BY_CRITIC -> IrisAlertRed
+                                        StepStatus.FAILED -> IrisAlertRed
+                                        StepStatus.PENDING -> IrisTextMuted
+                                    },
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = step.title,
+                                    color = IrisTextPrimary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = step.toolName,
+                                    color = IrisTextMuted,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Chat Conversation Feed
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(messages, key = { it.id }) { msg ->
+                ChatMessageItem(
+                    message = msg,
+                    onSpeak = {
+                        viewModel.speechManager.speak(msg.text)
+                    },
+                    onCopy = {
+                        viewModel.nativeBridge.copyToClipboard("IRIS Output", msg.text)
+                    }
+                )
+            }
+        }
+
+        // Quick Suggestion Chips
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val suggestions = listOf(
+                "Play music on Spotify",
+                "AnyClaw device status",
+                "Wipe memory cache (Test Critic)",
+                "Create battery automation",
+                "Remember audio profile",
+                "Status check & telemetry"
+            )
+            items(suggestions) { chipText ->
+                SuggestionChip(
+                    onClick = { viewModel.submitPrompt(chipText) },
+                    label = { Text(chipText, fontSize = 11.sp) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = IrisSurfaceVariant,
+                        labelColor = IrisCyanPrimary
+                    ),
+                    border = SuggestionChipDefaults.suggestionChipBorder(
+                        enabled = true,
+                        borderColor = IrisBorder
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+        }
+
+        // Bottom Input Dock
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = IrisSurfaceVariant,
+            tonalElevation = 6.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Mic Button
+                IconButton(
+                    onClick = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                            viewModel.toggleListening()
+                        } else {
+                            recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (isListening) IrisAlertRed else IrisSurfaceElevated)
+                        .testTag("microphone_button")
+                ) {
+                    Icon(
+                        imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                        contentDescription = "Voice Input",
+                        tint = if (isListening) IrisTextPrimary else IrisCyanPrimary
+                    )
+                }
+
+                // Text Input
+                TextField(
+                    value = inputText,
+                    onValueChange = { viewModel.setInputText(it) },
+                    placeholder = {
+                        Text(
+                            text = if (language == AppLanguage.BENGALI) "ভয়েস কমান্ড বা নির্দেশ টাইপ করুন..." else "Transmitting directive to neural swarm...",
+                            color = IrisTextMuted,
+                            fontSize = 13.sp
+                        )
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(24.dp))
+                        .testTag("prompt_input_field"),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = IrisSurfaceElevated,
+                        unfocusedContainerColor = IrisSurfaceElevated,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedTextColor = IrisTextPrimary,
+                        unfocusedTextColor = IrisTextPrimary
+                    ),
+                    singleLine = true
+                )
+
+                // Send Button
+                IconButton(
+                    onClick = { viewModel.submitPrompt() },
+                    enabled = inputText.isNotBlank() && !isProcessing,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (inputText.isNotBlank() && !isProcessing) IrisCyanPrimary else IrisSurfaceElevated)
+                        .testTag("send_prompt_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Transmit",
+                        tint = if (inputText.isNotBlank() && !isProcessing) IrisBackground else IrisTextMuted
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatMessageItem(
+    message: ChatMessage,
+    onSpeak: () -> Unit,
+    onCopy: () -> Unit
+) {
+    val isUser = message.sender == MessageSender.USER
+    val alignment = if (isUser) Alignment.End else Alignment.Start
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = alignment
+    ) {
+        if (!isUser) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(bottom = 3.dp)
+            ) {
+                val agentType = message.agentType ?: AgentType.ORCHESTRATOR
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(getAgentColor(agentType))
+                )
+                Text(
+                    text = agentType.displayName.uppercase(),
+                    color = getAgentColor(agentType),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+                if (message.latencyMs != null) {
+                    Text(
+                        text = "• ${message.latencyMs}ms",
+                        color = IrisTextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+                if (message.emotionTone != null) {
+                    Text(
+                        text = "[${message.emotionTone}]",
+                        color = IrisVioletSecondary,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .clip(
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isUser) 16.dp else 2.dp,
+                        bottomEnd = if (isUser) 2.dp else 16.dp
+                    )
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isUser) IrisCyanPrimary.copy(alpha = 0.5f) else IrisBorder,
+                    shape = RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isUser) 16.dp else 2.dp,
+                        bottomEnd = if (isUser) 2.dp else 16.dp
+                    )
+                ),
+            color = if (isUser) IrisSurfaceElevated else IrisSurface
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = message.text,
+                    color = IrisTextPrimary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+
+                if (!isUser) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onSpeak,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = "Speak Text",
+                                tint = IrisCyanPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = onCopy,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy",
+                                tint = IrisTextMuted,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

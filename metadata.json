@@ -1,0 +1,6 @@
+{
+  "name": "IRIS-MX Ultra",
+  "description": "Voice-first, multi-agent proactive neural execution system with 7 autonomous agents, real device bridges, function calling, and code generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
