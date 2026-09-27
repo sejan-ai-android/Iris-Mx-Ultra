@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +58,8 @@ fun OrchestrationScreen(
     val inputText by viewModel.inputText.collectAsState()
     val language by viewModel.appLanguage.collectAsState()
     val telemetry by viewModel.telemetry.collectAsState()
+    val handsFreeContinuous by viewModel.handsFreeContinuous.collectAsState()
+    val isAccessibilityActive by viewModel.isAccessibilityActive.collectAsState()
 
     // Permission launcher for RECORD_AUDIO
     val recordAudioLauncher = rememberLauncherForActivityResult(
@@ -130,6 +133,34 @@ fun OrchestrationScreen(
                     )
                 }
 
+                // Hands-Free Continuous Mode Pill
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { viewModel.toggleHandsFreeContinuous() },
+                    color = if (handsFreeContinuous) IrisCyanPrimary.copy(alpha = 0.15f) else IrisSurfaceVariant,
+                    border = BorderStroke(1.dp, if (handsFreeContinuous) IrisCyanPrimary else Color.Transparent)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (handsFreeContinuous) IrisCyanPrimary else IrisTextMuted)
+                        )
+                        Text(
+                            text = if (handsFreeContinuous) (if (language == AppLanguage.BENGALI) "হ্যান্ডস-ফ্রি" else "Hands-Free") else (if (language == AppLanguage.BENGALI) "ম্যানুয়াল" else "Manual"),
+                            color = if (handsFreeContinuous) IrisCyanPrimary else IrisTextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 // Ready Badge
                 Surface(
                     modifier = Modifier.clip(RoundedCornerShape(12.dp)),
@@ -153,6 +184,49 @@ fun OrchestrationScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+            }
+        }
+
+        // Accessibility Service Notice Banner
+        AnimatedVisibility(visible = !isAccessibilityActive) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable { viewModel.openAccessibilitySettings() },
+                color = IrisSurfaceElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, IrisVioletSecondary.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Accessibility,
+                            contentDescription = "Accessibility",
+                            tint = IrisVioletSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BENGALI) "হ্যান্ডস-ফ্রি স্ক্রিন ও ডিভাইস নিয়ন্ত্রণে Accessibility চালু করুন" else "Enable Accessibility for hands-free device control",
+                            color = IrisTextPrimary,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Text(
+                        text = if (language == AppLanguage.BENGALI) "চালু করুন" else "Enable",
+                        color = IrisCyanPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -181,18 +255,20 @@ fun OrchestrationScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // State caption
+            // State caption with Hands-Free readiness
             Text(
                 text = when {
-                    isListening -> if (language == AppLanguage.BENGALI) "আপনাকে শুনছি... বলুন" else "Listening to you... speak naturally"
-                    isProcessing -> if (language == AppLanguage.BENGALI) "আপনার অনুরোধ নিয়ে কাজ করছি..." else "Working on your request..."
+                    isListening -> if (language == AppLanguage.BENGALI) "আপনাকে শুনছি... যেকোনো কথা বলুন" else "Listening to you... speak naturally"
+                    isProcessing -> if (language == AppLanguage.BENGALI) "আপনার কাজটি দ্রুত প্রস্তুত করছি..." else "Handling immediately..."
                     isSpeaking -> if (language == AppLanguage.BENGALI) "উত্তর দিচ্ছি..." else "Speaking..."
+                    handsFreeContinuous -> if (language == AppLanguage.BENGALI) "হ্যান্ডস-ফ্রি মোড সক্রিয়—সরাসরি কথা বলুন" else "Hands-free continuous mode ready—speak anytime"
                     else -> if (language == AppLanguage.BENGALI) "ভয়েস বা টেক্সটে যেকোনো কথা বলতে পারেন" else "Tap orb or mic to speak with Iris"
                 },
                 color = when {
                     isListening -> IrisAlertRed
                     isProcessing -> IrisVioletSecondary
                     isSpeaking -> IrisEmeraldAccent
+                    handsFreeContinuous -> IrisCyanPrimary
                     else -> IrisTextMuted
                 },
                 fontSize = 11.sp,
@@ -272,19 +348,23 @@ fun OrchestrationScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val suggestions = if (language == AppLanguage.BENGALI) listOf(
+                "স্ক্রিনে কি আছে পড়ে শোনাও 📱",
+                "হোম স্ক্রিনে ফিরে যাও 🏠",
+                "নোটিফিকেশন প্যানেল নামাও 🔔",
+                "নিচে স্ক্রল করো 📜",
                 "একটি সুন্দর গান শোনাও 🎵",
-                "আজকের দিনটি কেমন যাবে? ☀️",
-                "একটি গুরুত্বপূর্ণ নোট মনে রাখো 📝",
                 "ডিভাইসের যত্ন ও ব্যাটারি চেক 🔋",
-                "কেমন আছো আইরিস? 👋",
-                "Play calming music 🎧"
+                "একটি গুরুত্বপূর্ণ নোট মনে রাখো 📝",
+                "কেমন আছো আইরিস? 👋"
             ) else listOf(
+                "Read what's on my screen 📱",
+                "Go to home screen 🏠",
+                "Show notifications 🔔",
+                "Scroll down 📜",
                 "Play relaxing music 🎵",
-                "How is my day looking? ☀️",
-                "Save a quick note for me 📝",
                 "Check device care & battery 🔋",
-                "How are you doing today? 👋",
-                "Open settings ⚙️"
+                "Save a quick note for me 📝",
+                "How are you doing today? 👋"
             )
             items(suggestions) { chipText ->
                 SuggestionChip(

@@ -32,6 +32,8 @@ fun SettingsScreen(
     val customApiKey by viewModel.customApiKey.collectAsState()
     val autoSpeak by viewModel.autoSpeakResponse.collectAsState()
     val recentLogs by viewModel.recentLogs.collectAsState()
+    val handsFreeContinuous by viewModel.handsFreeContinuous.collectAsState()
+    val isAccessibilityActive by viewModel.isAccessibilityActive.collectAsState()
 
     var showKeyDialog by remember { mutableStateOf(false) }
     var keyInput by remember { mutableStateOf(customApiKey) }
@@ -84,41 +86,154 @@ fun SettingsScreen(
         }
 
         // Section: Voice & Speech Pipeline
-        SettingSection(title = "VOICE & NEURAL TTS PIPELINE") {
+        SettingSection(title = "VOICE & HANDS-FREE INTERACTION") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp)),
+                    color = IrisSurfaceElevated
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Hands-Free Continuous Listening",
+                                color = IrisCyanPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Seamless back-and-forth hands-free conversation without manual taps or orb presses",
+                                color = IrisTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = handsFreeContinuous,
+                            onCheckedChange = { viewModel.toggleHandsFreeContinuous() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = IrisBackground,
+                                checkedTrackColor = IrisCyanPrimary
+                            )
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp)),
+                    color = IrisSurfaceElevated
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Auto-Speak Responses",
+                                color = IrisTextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Voice synthesis via local TextToSpeech engine with sub-second delivery",
+                                color = IrisTextMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = autoSpeak,
+                            onCheckedChange = { viewModel.toggleAutoSpeak() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = IrisBackground,
+                                checkedTrackColor = IrisCyanPrimary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section: Device Accessibility & Full Hands-Free Control
+        SettingSection(title = "DEVICE CONTROL & ACCESSIBILITY") {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp)),
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, if (isAccessibilityActive) IrisEmeraldAccent.copy(alpha = 0.5f) else IrisVioletSecondary.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
                 color = IrisSurfaceElevated
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Accessibility,
+                                contentDescription = "Accessibility",
+                                tint = if (isAccessibilityActive) IrisEmeraldAccent else IrisVioletSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Hands-Free Mobile Device Control",
+                                color = IrisTextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isAccessibilityActive) IrisEmeraldAccent.copy(alpha = 0.2f) else IrisVioletSecondary.copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = if (isAccessibilityActive) "ACTIVE" else "NOT ENABLED",
+                                color = if (isAccessibilityActive) IrisEmeraldAccent else IrisVioletSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Allows ExecutorAgent to read screen content, click on-screen buttons, navigate apps, type, and scroll hands-free via voice commands.",
+                        color = IrisTextMuted,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { viewModel.openAccessibilitySettings() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = IrisSurfaceVariant,
+                            contentColor = IrisCyanPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
-                            text = "Auto-Speak Swarm Responses",
-                            color = IrisTextPrimary,
-                            fontSize = 13.sp,
+                            text = if (isAccessibilityActive) "Manage System Accessibility Settings" else "Enable IRIS-MX Accessibility in Settings",
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Play response audio via local TextToSpeech engine automatically",
-                            color = IrisTextMuted,
-                            fontSize = 11.sp
-                        )
                     }
-                    Switch(
-                        checked = autoSpeak,
-                        onCheckedChange = { viewModel.toggleAutoSpeak() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = IrisBackground,
-                            checkedTrackColor = IrisCyanPrimary
-                        )
-                    )
                 }
             }
         }

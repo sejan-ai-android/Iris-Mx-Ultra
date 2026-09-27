@@ -79,24 +79,29 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
     val isListening = speechManager.isListening
     val isSpeaking = speechManager.isSpeaking
     val audioRmsDb = speechManager.audioRmsDb
+    val handsFreeContinuous = speechManager.handsFreeContinuous
+
+    private val _isAccessibilityActive = MutableStateFlow(nativeBridge.isAccessibilityActive())
+    val isAccessibilityActive: StateFlow<Boolean> = _isAccessibilityActive.asStateFlow()
 
     init {
-        // Initial warm, human-like welcome message
+        // Initial warm, human-like welcome message with hands-free readiness
         _messages.value = listOf(
             ChatMessage(
                 id = UUID.randomUUID().toString(),
                 sender = MessageSender.AGENT,
-                text = "হ্যালো! আমি IRIS, আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী ও নির্ভরযোগ্য বন্ধু।\nআজকে আপনাকে কীভাবে সাহায্য করতে পারি? গান শোনা, গুরুত্বপূর্ণ তথ্য মনে রাখা, কিংবা যেকোনো কাজের কথা আমাকে নির্দ্বিধায় বলতে পারেন।",
+                text = "হ্যালো! আমি IRIS, আপনার সার্বক্ষণিক ব্যক্তিগত সহকারী ও নির্ভরযোগ্য বন্ধু।\nহ্যান্ডস-ফ্রি মোড প্রস্তুত রয়েছে—যেকোনো কথা বা মোবাইল ডিভাইস নিয়ন্ত্রণের কমান্ড সরাসরি মুখে বলতে পারেন!",
                 agentType = AgentType.ORCHESTRATOR,
                 emotionTone = "বন্ধুসুলভ ও আন্তরিক"
             )
         )
 
-        // Periodic telemetry polling
+        // Periodic telemetry & accessibility status polling
         viewModelScope.launch {
             while (true) {
                 _telemetry.value = nativeBridge.readTelemetry()
-                delay(3000)
+                _isAccessibilityActive.value = nativeBridge.isAccessibilityActive()
+                delay(2500)
             }
         }
     }
@@ -128,6 +133,16 @@ class IrisViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleAutoSpeak() {
         _autoSpeakResponse.value = !_autoSpeakResponse.value
+    }
+
+    fun toggleHandsFreeContinuous() {
+        val next = !speechManager.handsFreeContinuous.value
+        speechManager.setHandsFreeContinuous(next)
+        nativeBridge.triggerHapticFeedback(false)
+    }
+
+    fun openAccessibilitySettings() {
+        nativeBridge.openAccessibilitySettings()
     }
 
     fun toggleListening() {

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">IRIS-MX Ultra</string>
+    <string name="accessibility_service_description">IRIS-MX Ultra Hands-Free Voice Device Control &amp; Accessibility Assistance.</string>
 </resources>

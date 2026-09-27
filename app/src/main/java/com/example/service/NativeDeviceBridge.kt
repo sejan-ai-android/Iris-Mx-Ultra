@@ -156,4 +156,56 @@ class NativeDeviceBridge(private val context: Context) {
             false
         }
     }
+
+    fun isAccessibilityActive(): Boolean {
+        return IrisAccessibilityService.isRunning()
+    }
+
+    fun openAccessibilitySettings() {
+        val intent = Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    fun performAccessibilityControl(
+        actionType: String,
+        target: String? = null,
+        inputContent: String? = null
+    ): Pair<Boolean, String> {
+        val service = IrisAccessibilityService.instance
+        if (service == null) {
+            return Pair(
+                false,
+                "অ্যাক্সেসিবিলিটি সার্ভিস সক্রিয় নেই। হ্যান্ডস-ফ্রি স্ক্রিন ও ডিভাইস নিয়ন্ত্রণের জন্য Settings > Accessibility তে গিয়ে 'IRIS-MX Ultra' সার্ভিসটি চালু করুন।"
+            )
+        }
+
+        return when (actionType.uppercase()) {
+            "READ_SCREEN" -> {
+                val report = service.readScreen()
+                Pair(true, report.fullTextSummary)
+            }
+            "CLICK" -> {
+                if (target.isNullOrBlank()) {
+                    Pair(false, "ক্লিক করার জন্য বাটনের নাম বা টেক্সট উল্লেখ করুন।")
+                } else {
+                    service.clickElement(target)
+                }
+            }
+            "TYPE", "ENTER_TEXT" -> {
+                if (inputContent.isNullOrBlank()) {
+                    Pair(false, "টাইপ করার জন্য টেক্সট প্রদান করুন।")
+                } else {
+                    service.enterText(target, inputContent)
+                }
+            }
+            "SCROLL_DOWN" -> service.scrollScreen(forward = true)
+            "SCROLL_UP" -> service.scrollScreen(forward = false)
+            "HOME", "BACK", "RECENTS", "NOTIFICATIONS", "QUICK_SETTINGS", "LOCK_SCREEN" -> {
+                service.performDeviceNavigation(actionType)
+            }
+            else -> Pair(false, "অজানা অ্যাক্সেসিবিলিটি অ্যাকশন: $actionType")
+        }
+    }
 }

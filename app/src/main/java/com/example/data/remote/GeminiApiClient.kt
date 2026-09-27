@@ -14,9 +14,9 @@ import java.util.concurrent.TimeUnit
 
 class GeminiApiClient {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -55,11 +55,11 @@ class GeminiApiClient {
             contentsArray.put(userContent)
             rootJson.put("contents", contentsArray)
 
-            // Generation config
+            // Generation config - Optimized for ultra-low latency sub-second delivery
             val generationConfig = JSONObject()
-            generationConfig.put("temperature", 0.3)
-            generationConfig.put("topP", 0.8)
-            generationConfig.put("maxOutputTokens", 1024)
+            generationConfig.put("temperature", 0.2)
+            generationConfig.put("topP", 0.85)
+            generationConfig.put("maxOutputTokens", 160)
             rootJson.put("generationConfig", generationConfig)
 
             val requestBody = rootJson.toString().toRequestBody(jsonMediaType)

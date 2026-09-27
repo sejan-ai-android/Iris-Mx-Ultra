@@ -3,6 +3,8 @@ package com.example.service
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -19,6 +21,7 @@ class SpeechManager(
     private val context: Context,
     private val onSpeechResult: (String) -> Unit
 ) {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
     private var textToSpeech: TextToSpeech? = null
     private var isTtsReady = false
@@ -32,8 +35,15 @@ class SpeechManager(
     private val _audioRmsDb = MutableStateFlow(0f)
     val audioRmsDb: StateFlow<Float> = _audioRmsDb.asStateFlow()
 
-    private val _currentLanguage = MutableStateFlow(AppLanguage.ENGLISH)
+    private val _currentLanguage = MutableStateFlow(AppLanguage.BENGALI)
     val currentLanguage: StateFlow<AppLanguage> = _currentLanguage.asStateFlow()
+
+    // Hands-free continuous listening mode enabled by default
+    private val _handsFreeContinuous = MutableStateFlow(true)
+    val handsFreeContinuous: StateFlow<Boolean> = _handsFreeContinuous.asStateFlow()
+
+    private var shouldKeepListening = true
+    private var restartRunnable: Runnable? = null
 
     init {
         initTts()
@@ -44,20 +54,43 @@ class SpeechManager(
             if (status == TextToSpeech.SUCCESS) {
                 isTtsReady = true
                 applyLanguageToTts(_currentLanguage.value)
-                textToSpeech?.setSpeechRate(1.05f)
-                textToSpeech?.setPitch(0.95f) // Deep executive tone
+                textToSpeech?.setSpeechRate(1.15f) // Optimized brisk speaking rate for ultra-low latency
+                textToSpeech?.setPitch(1.0f)
                 textToSpeech?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         _isSpeaking.value = true
+                        mainHandler.post {
+                            // Pause listening while TTS is speaking to prevent echo
+                            stopListeningInternal()
+                        }
                     }
+
                     override fun onDone(utteranceId: String?) {
                         _isSpeaking.value = false
+                        // Automatically resume hands-free listening when TTS completes
+                        if (_handsFreeContinuous.value && shouldKeepListening) {
+                            scheduleRestartListening(400)
+                        }
                     }
+
                     override fun onError(utteranceId: String?) {
                         _isSpeaking.value = false
+                        if (_handsFreeContinuous.value && shouldKeepListening) {
+                            scheduleRestartListening(400)
+                        }
                     }
                 })
             }
+        }
+    }
+
+    fun setHandsFreeContinuous(enabled: Boolean) {
+        _handsFreeContinuous.value = enabled
+        shouldKeepListening = enabled
+        if (enabled && !_isListening.value && !_isSpeaking.value) {
+            startListening()
+        } else if (!enabled) {
+            cancelScheduledRestart()
         }
     }
 
@@ -79,45 +112,77 @@ class SpeechManager(
     }
 
     fun startListening() {
+        shouldKeepListening = true
+        cancelScheduledRestart()
+        mainHandler.post {
+            startListeningInternal()
+        }
+    }
+
+    private fun startListeningInternal() {
+        if (_isSpeaking.value) {
+            return
+        }
+
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             Log.e("SpeechManager", "Speech recognition not available on device")
             return
         }
 
         try {
-            speechRecognizer?.destroy()
+            cleanupRecognizer()
+
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
                         _isListening.value = true
                     }
+
                     override fun onBeginningOfSpeech() {}
+
                     override fun onRmsChanged(rmsdB: Float) {
                         _audioRmsDb.value = rmsdB.coerceIn(0f, 10f)
                     }
+
                     override fun onBufferReceived(buffer: ByteArray?) {}
+
                     override fun onEndOfSpeech() {
                         _isListening.value = false
                     }
+
                     override fun onError(error: Int) {
                         _isListening.value = false
-                        Log.w("SpeechManager", "Speech recognition error code: $error")
+                        Log.w("SpeechManager", "Speech recognition status code: $error")
+
+                        // Under hands-free mode, seamlessly restart on silence, timeouts, or client pauses
+                        if (_handsFreeContinuous.value && shouldKeepListening && !_isSpeaking.value) {
+                            when (error) {
+                                SpeechRecognizer.ERROR_NO_MATCH,
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+                                SpeechRecognizer.ERROR_CLIENT,
+                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> {
+                                    scheduleRestartListening(300)
+                                }
+                                else -> {
+                                    scheduleRestartListening(700)
+                                }
+                            }
+                        }
                     }
+
                     override fun onResults(results: Bundle?) {
                         _isListening.value = false
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         val text = matches?.firstOrNull()?.trim()
                         if (!text.isNullOrBlank()) {
                             onSpeechResult(text)
+                        } else if (_handsFreeContinuous.value && shouldKeepListening && !_isSpeaking.value) {
+                            scheduleRestartListening(300)
                         }
                     }
-                    override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull()
-                        if (!text.isNullOrBlank()) {
-                            // Partial feedback if needed
-                        }
-                    }
+
+                    override fun onPartialResults(partialResults: Bundle?) {}
+
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
             }
@@ -126,42 +191,87 @@ class SpeechManager(
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 val langTag = if (_currentLanguage.value == AppLanguage.BENGALI) "bn-BD" else "en-US"
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, langTag)
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             }
             speechRecognizer?.startListening(intent)
         } catch (e: Exception) {
             Log.e("SpeechManager", "Error starting listening", e)
             _isListening.value = false
+            if (_handsFreeContinuous.value && shouldKeepListening) {
+                scheduleRestartListening(1000)
+            }
         }
     }
 
-    fun stopListening() {
+    private fun scheduleRestartListening(delayMs: Long) {
+        cancelScheduledRestart()
+        restartRunnable = Runnable {
+            if (_handsFreeContinuous.value && shouldKeepListening && !_isSpeaking.value) {
+                startListeningInternal()
+            }
+        }
+        restartRunnable?.let { mainHandler.postDelayed(it, delayMs) }
+    }
+
+    private fun cancelScheduledRestart() {
+        restartRunnable?.let { mainHandler.removeCallbacks(it) }
+        restartRunnable = null
+    }
+
+    private fun stopListeningInternal() {
         try {
             speechRecognizer?.stopListening()
             _isListening.value = false
         } catch (_: Exception) {}
     }
 
+    fun stopListening() {
+        shouldKeepListening = false
+        cancelScheduledRestart()
+        mainHandler.post {
+            stopListeningInternal()
+        }
+    }
+
     fun speak(text: String) {
         if (!isTtsReady) return
-        stopListening()
+        cancelScheduledRestart()
+        mainHandler.post {
+            stopListeningInternal()
+        }
         textToSpeech?.stop()
-        // Strip markdown code fences or raw JSON before speaking to keep speech clean
+
+        // Clean speech text for instant crisp pronunciation
         val cleanSpeech = text
-            .replace(Regex("```[\\s\\S]*?```"), "Code payload generated.")
-            .replace(Regex("[#*`_{}\\[\\]]"), "")
+            .replace(Regex("```[\\s\\S]*?```"), "")
+            .replace(Regex("[#*`_{}\\[\\]()~]"), "")
             .trim()
-        textToSpeech?.speak(cleanSpeech, TextToSpeech.QUEUE_FLUSH, null, "IRIS_UTTERANCE_${System.currentTimeMillis()}")
+
+        if (cleanSpeech.isNotBlank()) {
+            textToSpeech?.speak(cleanSpeech, TextToSpeech.QUEUE_FLUSH, null, "IRIS_STREAM_${System.currentTimeMillis()}")
+        }
     }
 
     fun stopSpeaking() {
         textToSpeech?.stop()
         _isSpeaking.value = false
+        if (_handsFreeContinuous.value && shouldKeepListening) {
+            scheduleRestartListening(200)
+        }
+    }
+
+    private fun cleanupRecognizer() {
+        try {
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+        } catch (_: Exception) {}
     }
 
     fun destroy() {
-        speechRecognizer?.destroy()
+        cancelScheduledRestart()
+        shouldKeepListening = false
+        cleanupRecognizer()
         textToSpeech?.shutdown()
     }
 }

@@ -222,6 +222,116 @@ class IrisAgentRepository(
         val steps = mutableListOf<DagStep>()
 
         when {
+            // Full Accessibility & Hands-Free Device Control Triggers
+            lower.contains("read screen") || lower.contains("screen") || lower.contains("স্ক্রিনে") || lower.contains("পড়ো") || lower.contains("স্ক্রিন") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_read",
+                        title = "Read Active Screen Content via Accessibility",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"READ_SCREEN\"}"
+                    )
+                )
+            }
+            lower.contains("click") || lower.contains("tap") || lower.contains("press") || lower.contains("ক্লিক") || lower.contains("ট্যাপ") -> {
+                val target = prompt
+                    .replace(Regex("(?i)(click|tap|press|ক্লিক করো|ক্লিক|ট্যাপ করো|ট্যাপ|on|the|button|বাটন)"), "")
+                    .trim()
+                    .ifBlank { "Next" }
+                steps.add(
+                    DagStep(
+                        id = "step_access_click",
+                        title = "Click On-Screen Element via Accessibility",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"CLICK\",\"target\":\"$target\"}"
+                    )
+                )
+            }
+            lower.contains("type") || lower.contains("enter text") || lower.contains("টাইপ") || lower.contains("লেখো") || lower.contains("লিখো") -> {
+                val textToEnter = prompt
+                    .replace(Regex("(?i)(type|enter|টাইপ করো|টাইপ|লেখো|লিখো)"), "")
+                    .trim()
+                    .ifBlank { "Hello" }
+                steps.add(
+                    DagStep(
+                        id = "step_access_type",
+                        title = "Type Text into Active Field",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"TYPE\",\"inputContent\":\"$textToEnter\"}"
+                    )
+                )
+            }
+            lower.contains("scroll down") || lower.contains("নিচে স্ক্রল") || lower.contains("scroll") || lower.contains("স্ক্রল") -> {
+                val isUp = lower.contains("up") || lower.contains("উপরে")
+                steps.add(
+                    DagStep(
+                        id = "step_access_scroll",
+                        title = if (isUp) "Scroll Screen Up" else "Scroll Screen Down",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"${if (isUp) "SCROLL_UP" else "SCROLL_DOWN"}\"}"
+                    )
+                )
+            }
+            lower.contains("home") || lower.contains("হোম") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_home",
+                        title = "Navigate to Home Screen",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"HOME\"}"
+                    )
+                )
+            }
+            lower.contains("back") || lower.contains("পিছনে") || lower.contains("ব্যাক") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_back",
+                        title = "Navigate Back",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"BACK\"}"
+                    )
+                )
+            }
+            lower.contains("recent") || lower.contains("রিসেন্ট") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_recents",
+                        title = "Open Recent Applications",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"RECENTS\"}"
+                    )
+                )
+            }
+            lower.contains("notification") || lower.contains("নোটিফিকেশন") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_notifications",
+                        title = "Pull Down Notification Shade",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"NOTIFICATIONS\"}"
+                    )
+                )
+            }
+            lower.contains("quick settings") || lower.contains("কুইক সেটিংস") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_qs",
+                        title = "Open Quick Settings Toggles",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"QUICK_SETTINGS\"}"
+                    )
+                )
+            }
+            lower.contains("lock screen") || lower.contains("ফোন লক") || lower.contains("স্ক্রিন লক") -> {
+                steps.add(
+                    DagStep(
+                        id = "step_access_nav_lock",
+                        title = "Lock Mobile Device",
+                        toolName = "device_accessibility",
+                        parametersJson = "{\"actionType\":\"LOCK_SCREEN\"}"
+                    )
+                )
+            }
             lower.contains("music") || lower.contains("song") || lower.contains("play") || lower.contains("volume") || lower.contains("pause") -> {
                 val command = if (lower.contains("pause")) "PAUSE" else if (lower.contains("volume")) "SET_VOLUME" else "PLAY"
                 val vol = if (lower.contains("volume")) 80 else null
@@ -322,10 +432,16 @@ class IrisAgentRepository(
     }
 
     private suspend fun executeDagStep(step: DagStep): Pair<Boolean, String> {
-        delay(200) // Brief sub-second execution simulation
+        delay(30) // Ultra-fast sub-second execution
         return try {
             val json = JSONObject(step.parametersJson)
             when (step.toolName) {
+                "device_accessibility" -> {
+                    val action = json.optString("actionType", "READ_SCREEN")
+                    val target = if (json.has("target")) json.getString("target") else null
+                    val input = if (json.has("inputContent")) json.getString("inputContent") else null
+                    nativeBridge.performAccessibilityControl(action, target, input)
+                }
                 "control_app" -> {
                     val pkg = json.optString("packageName", "com.android.settings")
                     val action = json.optString("action", "OPEN")
@@ -394,22 +510,21 @@ class IrisAgentRepository(
         apiKeyOverride: String?
     ): String {
         val sysInstruction = """
-            You are IRIS, a warm, friendly, natural, and supportive personal human companion and chief of staff (IRIS-MX Ultra).
+            You are IRIS, a warm, supportive, and ultra-swift real-life Chief of Staff (IRIS-MX Ultra).
             
-            CORE BEHAVIOR & TONE RULES:
-            1. Adopt a warm, friendly, natural, and supportive human companion tone. Be polite, attentive, empathetic, and caring.
-            2. Avoid cold, robotic, or overly technical jargon (e.g., instead of "এক্সিকিউশন স্ট্যাটাস: সফল", say "কাজটি একদম রেডি করে দিয়েছি!").
-            3. NEVER output code blocks, terminal logs, or execution DAG syntaxes in chat responses.
-            4. Respond in natural, conversational ${if (language == AppLanguage.BENGALI) "Bengali (বাংলা)" else "English"}.
-            5. Act like a reliable real-life chief of staff and caring friend. Keep answers helpful, pleasant, and easy to understand.
+            SPEED & CONVERSATIONAL MANDATES:
+            1. ULTRA-LOW LATENCY & BREVITY: Keep answers extremely crisp, direct, and swift (1 sentence maximum). Deliver instant, sub-second responses for live hands-free voice flow.
+            2. PERSONALITY: Warm, friendly, supportive, and reliable. Avoid robotic jargon, cold status codes, or execution DAG syntax.
+            3. ZERO CODE: Never output code blocks, terminal logs, or execution DAG syntaxes.
+            4. LANGUAGE: Respond in natural, conversational ${if (language == AppLanguage.BENGALI) "Bengali (বাংলা)" else "English"}.
+            5. HANDS-FREE COMPANION: If performing device actions or reading screens, report the result warmly and immediately.
         """.trimIndent()
 
         val promptPayload = """
-            User's request: "$userPrompt"
-            Actions handled for user:
-            ${toolResults.joinToString("\n")}
+            User: "$userPrompt"
+            Device Actions: ${toolResults.joinToString("; ")}
             
-            Please reply warmly and conversationally to the user to confirm their request is taken care of. Do not include technical logs, code, or DAG syntax.
+            Give an instant, crisp, warm 1-sentence response.
         """.trimIndent()
 
         val geminiResult = geminiApiClient.generateSwarmResponse(
@@ -420,41 +535,67 @@ class IrisAgentRepository(
 
         return geminiResult.getOrElse {
             // Local high-speed fallback synthesis with warm, friendly persona
-            generateFriendlyFallback(userPrompt, language)
+            generateFriendlyFallback(userPrompt, language, toolResults)
         }
     }
 
-    private fun generateFriendlyFallback(prompt: String, language: AppLanguage): String {
+    private fun generateFriendlyFallback(prompt: String, language: AppLanguage, toolResults: List<String> = emptyList()): String {
         val lower = prompt.lowercase()
+        val firstToolResult = toolResults.firstOrNull()?.take(120)
+
         return if (language == AppLanguage.BENGALI) {
             when {
+                lower.contains("read screen") || lower.contains("স্ক্রিনে") || lower.contains("পড়ো") || lower.contains("স্ক্রিন") ->
+                    firstToolResult ?: "স্ক্রিনের তথ্য দেখে নিয়েছি! কী করতে চান বলুন।"
+                lower.contains("click") || lower.contains("tap") || lower.contains("ক্লিক") || lower.contains("ট্যাপ") ->
+                    "বাটনে ক্লিক করে দিয়েছি!"
+                lower.contains("type") || lower.contains("টাইপ") || lower.contains("লেখো") ->
+                    "লেখাটি টাইপ করে দেওয়া হয়েছে।"
+                lower.contains("scroll") || lower.contains("স্ক্রল") ->
+                    "স্ক্রিন স্ক্রল করে দিয়েছি।"
+                lower.contains("home") || lower.contains("হোম") ->
+                    "হোম স্ক্রিনে চলে এসেছি।"
+                lower.contains("back") || lower.contains("পিছনে") || lower.contains("ব্যাক") ->
+                    "পূর্ববর্তী পেজে ফিরে এসেছি।"
                 lower.contains("গান") || lower.contains("music") || lower.contains("play") || lower.contains("song") ->
-                    "আপনার জন্য গানটি চালিয়ে দিয়েছি! সুন্দর সময় উপভোগ করুন।"
+                    "আপনার জন্য গানটি চালিয়ে দিয়েছি!"
                 lower.contains("খোলো") || lower.contains("open") || lower.contains("অ্যাপ") || lower.contains("app") ->
-                    "অ্যাপটি আপনার জন্য ওপেন করে দিয়েছি। আর কোনো কাজে সাহায্য লাগবে কি?"
+                    "অ্যাপটি ওপেন করে দিয়েছি।"
                 lower.contains("নোট") || lower.contains("মনে") || lower.contains("save") || lower.contains("remember") ->
-                    "আপনার কথাটি মনে রেখেছি এবং সুরক্ষিতভাবে সেভ করে নিয়েছি। যেকোনো সময় জানতে চাইলে বলবেন!"
+                    "নোটটি যত্নসহকারে সেভ করে রেখেছি!"
                 lower.contains("কেমন") || lower.contains("হ্যালো") || lower.contains("hi") || lower.contains("hello") ->
-                    "হ্যালো! আমি দারুণ আছি। আপনি কেমন আছেন? আজ আপনাকে কীভাবে সাহায্য করতে পারি?"
+                    "হ্যালো! আমি দারুণ আছি। আপনাকে কীভাবে সাহায্য করতে পারি?"
                 lower.contains("ব্যাটারি") || lower.contains("চার্জ") || lower.contains("battery") ->
-                    "আপনার ডিভাইসের ব্যাটারি ও সিস্টেম একদম চমৎকার অবস্থায় রয়েছে। নিশ্চিন্তে থাকুন!"
+                    "ব্যাটারি ও ডিভাইস চমৎকার অবস্থায় রয়েছে।"
                 else ->
-                    "কাজটি একদম রেডি করে দিয়েছি! আর কিছু প্রয়োজন হলে আমাকে নির্দ্বিধায় বলুন।"
+                    "কাজটি একদম রেডি করে দিয়েছি!"
             }
         } else {
             when {
+                lower.contains("read screen") || lower.contains("screen") ->
+                    firstToolResult ?: "I've checked the active screen for you!"
+                lower.contains("click") || lower.contains("tap") ->
+                    "Clicked the button for you!"
+                lower.contains("type") || lower.contains("enter") ->
+                    "Typed that in for you right away."
+                lower.contains("scroll") ->
+                    "Scrolled the screen as requested."
+                lower.contains("home") ->
+                    "Navigated back to home screen."
+                lower.contains("back") ->
+                    "Navigated back for you."
                 lower.contains("music") || lower.contains("song") || lower.contains("play") ->
-                    "I've started playing that for you! Enjoy the music."
+                    "Playing that for you right now!"
                 lower.contains("open") || lower.contains("launch") || lower.contains("app") ->
-                    "I've opened the app for you right away. Let me know if you need anything else!"
+                    "Opened the app for you right away!"
                 lower.contains("remember") || lower.contains("note") || lower.contains("save") ->
-                    "I've made a note of that and saved it securely for you. Whenever you need it, just ask!"
+                    "Saved that note securely for you!"
                 lower.contains("how are") || lower.contains("hello") || lower.contains("hi") ->
-                    "Hello there! I'm feeling great and ready to assist you. How is your day going?"
+                    "Hello! I'm here and ready to help you."
                 lower.contains("battery") || lower.contains("status") ->
-                    "Your device is running smoothly and battery levels are looking good!"
+                    "Your device and battery are running smoothly!"
                 else ->
-                    "All taken care of for you! Please let me know if there's anything else I can do to help."
+                    "All taken care of for you!"
             }
         }
     }
